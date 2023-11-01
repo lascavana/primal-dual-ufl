@@ -208,15 +208,10 @@ if __name__ == "__main__":
     solver.create_problem(world)
     solver.phase_1()
     solver.phase_2()
+    primaldual_solution = solver.get_solution()
 
-    # for f in world.facilities:
-    #     print(f"Facility {f.id}: {f.open}")
-    # print(" ")
-    # for c in world.customers:
-    #     print(f"Customer {c.id} is connected to {c.witness}")
-    #     print(f"also paying for {c.affiliates}")
-
-
-    # plotter = Plotter(world)
-    # plotter.plot_solution(optimal_solution, title='Optimal solution')
-    # plotter.plot_phase1()
+    # plot solutions #
+    plotter = Plotter(world)
+    plotter.plot_solution(optimal_solution, title='Optimal solution')
+    plotter.plot_phase1()
+    plotter.plot_solution(primaldual_solution, title='Primal-dual solution')

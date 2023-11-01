@@ -116,7 +116,7 @@ class PrimalDualSolver():
                 model.addCons(z[u] + z[v] <= 1, f"({u}-{v})")
 
         # set objective value #
-        model.setObjective(quicksum(z[i] for i in open_facilities), "minimize")
+        model.setObjective(quicksum(z[i] for i in open_facilities), "maximize")
 
         # solve #
         model.optimize()
@@ -147,6 +147,9 @@ class PrimalDualSolver():
                     xsolution[c.id] = f_id
                 
         self._solution = Solution(xsolution, ysolution)
+
+    def get_solution(self):
+        return self._solution
                             
 
 
