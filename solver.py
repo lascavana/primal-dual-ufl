@@ -1,4 +1,5 @@
 import numpy as np
+from itertools import combinations
 from pyscipopt import Model, quicksum
 
 class Solution():
@@ -27,11 +28,11 @@ class PrimalDualSolver():
             if not c.is_connected:
                 c_id = c.id
                 f_id = c.get_next_facility()
-                slack = self._world.transport_costs[f_id][c_id] - c.alpha
-
-                if slack < min_slack:
-                    min_slack = slack
-                    nxt = c_id
+                if f_id is not None:
+                    slack = self._world.transport_costs[f_id][c_id] - c.alpha
+                    if slack < min_slack:
+                        min_slack = slack
+                        nxt = c_id
         
         return Event(nxt, time2event=min_slack)
 
@@ -44,9 +45,9 @@ class PrimalDualSolver():
                 f_id = f.id
                 if f.affiliates:
                     paid = np.sum([self._world.betas[f_id, c_id]  for c_id in f.affiliates])
+                    slack = (f.opening_cost - paid) / len(f.affiliates)
                 else:
-                    paid = 0.0
-                slack = f.opening_cost - paid
+                    slack = np.inf
                 if slack < min_slack:
                     min_slack = slack
                     nxt = f_id
@@ -90,11 +91,32 @@ class PrimalDualSolver():
                     self._world.customers[c_id].witness = f_id
                     unconnected_customers.remove( c_id )
 
-            break
+
 
     def phase_2(self):
-        pass
 
+        open_facilities = [i for i in range(self._world.num_f) if self._world.facilities[i].open]
+
+        model = Model("Independent Set")
+        model.setParam('display/verblevel', 0)
+
+        # create variables #
+        z = {}
+        for i in open_facilities:
+            z[i] = model.addVar(vtype="B", name=f"z({i})")
+
+        # create constraints #
+        for c in self._world.customers:
+            open_affiliates = [i for i in c.affiliates if i in open_facilities]
+            edges = list(combinations(open_affiliates, 2))
+            for u, v in edges:
+                model.addCons(z[u] + z[v] <= 1, f"({u}-{v})")
+
+        # set objective value #
+        model.setObjective(quicksum(z[i] for i in open_facilities), "minimize")
+
+        # solve #
+        model.optimize()
 
 
 
