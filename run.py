@@ -1,16 +1,21 @@
-import numpy as np 
+import numpy as np
+import matplotlib.pyplot as plt
+
+from scipy.sparse import dok_array
+
+from solver import UFLExactSolve
 
 
 class Customer():
     def __init__(self, c_id, ordered_facilities):
         self.id = c_id
         self.alpha = 0.0
-        
-        self.witness = None
-        self.is_connected = False
 
         self.affiliates = []
-        self.ordered_facilities = ordered_facilities # list of non-affiliate facilities in ascending order of distance
+        self.ordered_facilities = ordered_facilities # list of non-affiliate facilities in ascending order of distance 
+
+        self.witness = None
+        self.is_connected = False
 
     def get_next_facility(self, pop=False):
         idx = self.ordered_facilities[0]
@@ -26,26 +31,22 @@ class Facility():
 
         self.open = False
         self.affiliates = []
-        
-
-class Event():
-    def __init__(self, nxt, time2event):
-        self.nxt = nxt
-        self.time2event = time2event
-
 
 
 class World():
-    def __init__(self, num_f, num_c, transport_costs, opening_costs):
+    def __init__(self, num_f, num_c, facility_loc, customer_loc, transport_costs, opening_costs):
         assert( transport_costs.shape[0]== num_f)
         assert( transport_costs.shape[1]== num_c)
         assert( opening_costs.shape[0]== num_f)
 
         self.num_f = num_f
         self.num_c = num_c
+        self.facility_loc = facility_loc
+        self.customer_loc = customer_loc
         self.transport_costs = transport_costs
+        self.opening_costs = opening_costs
 
-        self.betas = scipy.dok_array((num_f, num_c), dtype=np.float32)
+        self.betas = dok_array((num_f, num_c), dtype=np.float32)
 
         # create facilities #
         self.facilities = []
@@ -59,7 +60,8 @@ class World():
             self.customers.append( Customer(j, pov_ordered_facilities) )
             
 
-              
+
+
 class WorldGenerator():
     def __init__(self, rng):
         self.rng = rng
@@ -72,94 +74,66 @@ class WorldGenerator():
         C = np.repeat(customer_loc[:, np.newaxis, :], m, axis=1)
         F = np.repeat(facility_loc[:, :, np.newaxis], n, axis=2)
         transport_costs = np.sum( (C-F)**2, axis=0 )
-        transport_costs = np.sqrt(transport_costs)
+        transport_costs = np.sqrt(transport_costs) # [num_f x num_c]
 
         # generate opening costs for facilities #
         opening_costs = rng.randint(0, max_opening_cost, size=m)
 
-        return World(m, n, transport_costs, opening_costs)
+        return World(m, n, facility_loc, customer_loc, transport_costs, opening_costs)
 
 
 
-
-class Solver():
-    def __init__(self):
-        self._world = None
-
-    def load_world(self, world):
+class Plotter():
+    def __init__(self, world):
         self._world = world
+        self.customer_loc = world.customer_loc
+        self.facility_loc = world.facility_loc
 
-    def next_tight_edge_event(self):
-        nxt = None
-        min_slack = np.inf
-        for c in self._world.customers:
-            if not c.connected:
-                c_id = c.id
-                f_id = c.get_next_facility()
-                slack = self._world.transport_costs[f_id][c_id] - c.alpha
+    def plot_problem(self):
+        fig, ax = plt.subplots()
+        ax.set_xlim([0,1])
+        ax.set_ylim([0,1])
+        ax.scatter(self.customer_loc[0], self.customer_loc[1], color='peru')
+        ax.scatter(self.facility_loc[0], self.facility_loc[1], color='slateblue')
+        plt.show()
 
-                if slack < min_slack:
-                    min_slack = slack
-                    nxt = c_id
+    def plot_solution(self, solution):
+        fig, ax = plt.subplots()
+        ax.set_xlim([0,1])
+        ax.set_ylim([0,1])
         
-        return Event(nxt, time2event=min_slack)
+        # plot all facility locations #
+        ax.scatter(self.facility_loc[0], self.facility_loc[1], alpha=0.4, color='slateblue')
 
+        # plot used edges #
+        for j in range(self._world.num_c):
+            i = solution.x[j]
+            xx = [self.customer_loc[0][j], self.facility_loc[0][i]]
+            yy = [self.customer_loc[1][j], self.facility_loc[1][i]]
+            ax.plot(xx, yy, color='k')
 
-    def next_opening_event(self):
-        nxt = None
-        min_slack = np.inf
-        for f in self._world.facilities:
-            if not f.open:
-                f_id = f.id
-                if f.affiliates:
-                    paid = np.sum([self._world.betas[f_id, c_id]  for c_id in f.affiliates])
-                else:
-                    paid = 0.0
-                slack = f.opening_cost - paid
-                if to_pay < min_slack:
-                    min_slack = slack
-                    nxt = f_id
+        # plot open facilities and customers #
+        ax.scatter(self.customer_loc[0], self.customer_loc[1], color='peru')
+        for i in range(self._world.num_f):
+            if solution.y[i]:
+                ax.scatter(self.facility_loc[0][i], self.facility_loc[1][i], alpha=1.0, color='slateblue')
 
-        return Event(nxt, time2event=min_slack)
-                    
-
-    def forward(self, timestep):
-        for c in self.world.customers:
-            if not c.connected:
-                c_id = c.id
-                c.alpha += timestep 
-                for f_id in c.affiliates:
-                    self._world.betas[f_id, c_id] += timestep
-
-    def phase_1(self):
-        unconnected_customers = [j for j in range(self._world.num_c)]
-
-        while unconnected_customers:
-
-            event_tight = self.next_tight_edge_event()
-            event_open = self.next_opening_event()
-
-            if event_tight.time2event < event_open.time2event:
-                forward( event_tight.time2event )
-                c_id = event_tight.nxt
-                f_id = self._world.customers[c_id].get_next_facility(pop=True)
-                self._world.customers[c_id].affiliates.append(f_id)
-                self._world.facilities[f_id].affiliates.append(c_id)
-            else:
-                forward( event_open.time2event )
-                f_id = event_open.nxt
-                self._world.facilities[f_id].open = True
-                for c_id in self._world.facilities[f_id].affiliates:
-                    self._world.customers[c_id].connected = True
-                    self._world.customers[c_id].witness = f_id
-                    self.unconnected_customers.remove( c_id )
-
-    def phase_2(self):
-        pass
+        plt.show()
 
 
 
+if __name__ == "__main__":
+    rng = np.random.RandomState(seed=72)
 
-rng = np.random.RandomState(seed=72)
-gen = WorldGenerator(rng)
-gen.generate(m=2, n=3)
+    # generate data #
+    generator = WorldGenerator(rng)
+    world = generator.generate(m=2, n=3, max_opening_cost=1.0)
+
+    # exact solver #
+    solver = UFLExactSolve()
+    solver.create_problem(world)
+    solver.solve()
+    solution = solver.get_solution()
+
+    plotter = Plotter(world)
+    plotter.plot_solution(solution)
