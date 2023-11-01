@@ -17,9 +17,11 @@ class Event():
 class PrimalDualSolver():
     def __init__(self):
         self._world = None
+        self._solution = None
 
     def create_problem(self, world):
         self._world = world
+        self._solution = None
 
     def next_tight_edge_event(self):
         nxt = None
@@ -62,6 +64,7 @@ class PrimalDualSolver():
                 c.alpha += timestep 
                 for f_id in c.affiliates:
                     self._world.betas[f_id, c_id] += timestep
+
 
     def phase_1(self):
         unconnected_customers = [j for j in range(self._world.num_c)]
@@ -117,6 +120,35 @@ class PrimalDualSolver():
 
         # solve #
         model.optimize()
+
+        # final opening decisions #
+        ysolution = {i: 0 for i in range(self._world.num_f)}
+        for i in open_facilities:
+            ysolution[i] = model.getVal(z[i])
+
+        # connecting decisions #
+        xsolution = {}
+        for c in self._world.customers:
+            if ysolution[c.witness]:
+                xsolution[c.id] = c.witness
+            else:
+                open_affiliates = [i for i in c.affiliates if ysolution[i]]
+                assert( len(open_affiliates) in [0,1] )
+                if len(open_affiliates) == 1:
+                    xsolution[c.id] = open_affiliates[0]
+                else:
+                    # connect to closest open facility
+                    f_id = None
+                    min_cost = np.inf
+                    for i in open_affiliates:
+                        if ysolution[i] and self._world.transport_costs[i][c.id] < min_cost:
+                            min_cost = self._world.transport_costs[i][c.id]
+                            f_id = i
+                    xsolution[c.id] = f_id
+                
+        self._solution = Solution(xsolution, ysolution)
+                            
+
 
 
 
