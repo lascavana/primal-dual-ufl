@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -162,11 +163,39 @@ class Plotter():
 
 
 if __name__ == "__main__":
-    rng = np.random.RandomState(seed=72)
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-s', '--seed',
+        help='Random generator seed (default 0).',
+        type=int,
+        default=72,
+    )
+    parser.add_argument(
+        '-f', '--num_f',
+        help='Number of facilities (default 2).',
+        type=int,
+        default=2,
+    )
+    parser.add_argument(
+        '-c', '--num_c',
+        help='Number of cutomers (default 4).',
+        type=int,
+        default=4,
+    )
+    parser.add_argument(
+        '-m', '--max_cost',
+        help='Maximum opening cost (default 0.5).',
+        type=float,
+        default=0.5,
+    )
+    args = parser.parse_args()
+
+    # random number generator #
+    rng = np.random.RandomState(seed=args.seed)
 
     # generate data #
     generator = WorldGenerator(rng)
-    world = generator.generate(m=2, n=4, max_opening_cost=0.4)
+    world = generator.generate(args.num_f, args.num_c, max_opening_cost=args.max_cost)
 
     # exact solver #
     solver = UFLExactSolve()
@@ -178,6 +207,7 @@ if __name__ == "__main__":
     solver = PrimalDualSolver()
     solver.create_problem(world)
     solver.phase_1()
+    solver.phase_2()
 
     # for f in world.facilities:
     #     print(f"Facility {f.id}: {f.open}")
