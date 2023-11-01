@@ -90,9 +90,10 @@ class PrimalDualSolver():
                 f_id = event_open.nxt
                 self._world.facilities[f_id].open = True
                 for c_id in self._world.facilities[f_id].affiliates:
-                    self._world.customers[c_id].is_connected = True
-                    self._world.customers[c_id].witness = f_id
-                    unconnected_customers.remove( c_id )
+                    if not self._world.customers[c_id].is_connected:
+                        self._world.customers[c_id].is_connected = True
+                        self._world.customers[c_id].witness = f_id
+                        unconnected_customers.remove( c_id )
 
 
 
