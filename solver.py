@@ -125,7 +125,7 @@ class PrimalDualSolver():
         # final opening decisions #
         ysolution = {i: 0 for i in range(self._world.num_f)}
         for i in open_facilities:
-            ysolution[i] = model.getVal(z[i])
+            ysolution[i] = int(model.getVal(z[i]))
 
         # connecting decisions #
         xsolution = {}
@@ -141,7 +141,7 @@ class PrimalDualSolver():
                     # connect to closest open facility
                     f_id = None
                     min_cost = np.inf
-                    for i in open_affiliates:
+                    for i in open_facilities:
                         if ysolution[i] and self._world.transport_costs[i][c.id] < min_cost:
                             min_cost = self._world.transport_costs[i][c.id]
                             f_id = i
