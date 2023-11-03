@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 from scipy.sparse import dok_array
 
+from utilities import Plotter
 from solver import UFLExactSolve, PrimalDualSolver
 
 
@@ -87,80 +88,6 @@ class WorldGenerator():
 
 
 
-class Plotter():
-    def __init__(self, world):
-        self._world = world
-        self.customer_loc = world.customer_loc
-        self.facility_loc = world.facility_loc
-
-    def plot_problem(self):
-        fig, ax = plt.subplots()
-        ax.set_xlim([0,1])
-        ax.set_ylim([0,1])
-        ax.scatter(self.customer_loc[0], self.customer_loc[1], color='peru')
-        ax.scatter(self.facility_loc[0], self.facility_loc[1], color='slateblue')
-        plt.show()
-
-    def plot_solution(self, solution, title=None):
-        fig, ax = plt.subplots()
-        ax.set_xlim([0,1])
-        ax.set_ylim([0,1])
-        if title is not None:
-            ax.set_title(title)
-        
-        # plot all facility locations #
-        ax.scatter(self.facility_loc[0], self.facility_loc[1], alpha=0.4, color='slateblue')
-
-        # plot used edges #
-        for j in range(self._world.num_c):
-            i = solution.x[j]
-            xx = [self.customer_loc[0][j], self.facility_loc[0][i]]
-            yy = [self.customer_loc[1][j], self.facility_loc[1][i]]
-            ax.plot(xx, yy, color='k')
-
-        # plot open facilities and customers #
-        ax.scatter(self.customer_loc[0], self.customer_loc[1], color='peru')
-        for i in range(self._world.num_f):
-            if solution.y[i]:
-                ax.scatter(self.facility_loc[0][i], self.facility_loc[1][i], alpha=1.0, color='slateblue')
-
-        plt.show()
-
-    def plot_phase1(self):
-        fig, ax = plt.subplots()
-        ax.set_xlim([0,1])
-        ax.set_ylim([0,1])
-        ax.set_title('Phase 1 solution')
-
-        # plot all facility locations #
-        ax.scatter(self.facility_loc[0], self.facility_loc[1], alpha=0.4, color='slateblue')
-
-        # plot special edges #
-        for c in self._world.customers:
-            c_id = c.id
-            for f_id in c.affiliates: 
-                xx = [self.customer_loc[0][c_id], self.facility_loc[0][f_id]]
-                yy = [self.customer_loc[1][c_id], self.facility_loc[1][f_id]]
-                ax.plot(xx, yy, color='k', linestyle='--')
-
-        # plot used edges #
-        for c in self._world.customers:
-            c_id = c.id
-            f_id = c.witness 
-            xx = [self.customer_loc[0][c_id], self.facility_loc[0][f_id]]
-            yy = [self.customer_loc[1][c_id], self.facility_loc[1][f_id]]
-            ax.plot(xx, yy, color='k')
-
-        # plot open facilities and customers #
-        ax.scatter(self.customer_loc[0], self.customer_loc[1], color='peru')
-        for f in self._world.facilities:
-            if f.open:
-                ax.scatter(self.facility_loc[0][f.id], self.facility_loc[1][f.id], alpha=1.0, color='slateblue')
-
-        plt.show()
-
-
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -212,6 +139,4 @@ if __name__ == "__main__":
 
     # plot solutions #
     plotter = Plotter(world)
-    plotter.plot_solution(optimal_solution, title='Optimal solution')
-    plotter.plot_phase1()
-    plotter.plot_solution(primaldual_solution, title='Primal-dual solution')
+    plotter.plot_3_solutions(optimal_solution, primaldual_solution)
